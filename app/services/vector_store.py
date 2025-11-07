@@ -2,6 +2,7 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 from typing import List, Optional, Dict, Any
 import logging
+import asyncio
 import uuid
 from app.config.settings import settings
 from app.services.embedding_service import get_embedding_service, ChunkWithEmbedding
@@ -200,6 +201,26 @@ class VectorStoreService:
             logger.error(f"Error storing documents: {e}")
             raise
 
+    async def store_documents_async(
+        self,
+        chunks_with_embeddings: List[ChunkWithEmbedding]
+    ) -> List[str]:
+        """
+        Async version: Store chunks with embeddings in Qdrant.
+
+        Args:
+            chunks_with_embeddings: List of ChunkWithEmbedding objects
+
+        Returns:
+            List of document IDs
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            self.store_documents,
+            chunks_with_embeddings
+        )
+
     def search(
         self,
         query_text: str,
@@ -245,6 +266,32 @@ class VectorStoreService:
         except Exception as e:
             logger.error(f"Error searching documents: {e}")
             raise
+
+    async def search_async(
+        self,
+        query_text: str,
+        top_k: int = 5,
+        score_threshold: Optional[float] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Async version: Search for similar documents by query text.
+
+        Args:
+            query_text: Search query text
+            top_k: Number of results to return (default: 5)
+            score_threshold: Minimum similarity score (optional)
+
+        Returns:
+            List of search results with scores, content, and metadata
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            self.search,
+            query_text,
+            top_k,
+            score_threshold
+        )
 
     def delete_document(self, doc_id: str) -> bool:
         """

@@ -1,5 +1,6 @@
 from typing import List, Dict, Any, Optional, Tuple
 import logging
+import asyncio
 from sentence_transformers import SentenceTransformer
 import numpy as np
 from app.models.document import DocumentChunk
@@ -107,6 +108,19 @@ class EmbeddingService:
             logger.error(f"Error generating embedding: {e}")
             raise
 
+    async def embed_text_async(self, text: str) -> List[float]:
+        """
+        Async version: Generate embedding for a single text.
+
+        Args:
+            text: Input text to embed
+
+        Returns:
+            List of floats representing the embedding vector
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self.embed_text, text)
+
     def embed_batch(
         self,
         texts: List[str],
@@ -160,6 +174,32 @@ class EmbeddingService:
             logger.error(f"Error generating batch embeddings: {e}")
             raise
 
+    async def embed_batch_async(
+        self,
+        texts: List[str],
+        batch_size: int = 32,
+        show_progress: bool = False
+    ) -> List[List[float]]:
+        """
+        Async version: Generate embeddings for multiple texts efficiently.
+
+        Args:
+            texts: List of input texts to embed
+            batch_size: Number of texts to process at once
+            show_progress: Whether to show progress bar
+
+        Returns:
+            List of embedding vectors
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            self.embed_batch,
+            texts,
+            batch_size,
+            show_progress
+        )
+
     def embed_chunks(
         self,
         chunks: List[DocumentChunk],
@@ -206,6 +246,32 @@ class EmbeddingService:
 
         logger.info(f"Successfully generated embeddings for {len(chunks_with_embeddings)} chunks")
         return chunks_with_embeddings
+
+    async def embed_chunks_async(
+        self,
+        chunks: List[DocumentChunk],
+        batch_size: int = 32,
+        show_progress: bool = True
+    ) -> List[ChunkWithEmbedding]:
+        """
+        Async version: Generate embeddings for a list of DocumentChunk objects.
+
+        Args:
+            chunks: List of DocumentChunk objects
+            batch_size: Number of chunks to process at once
+            show_progress: Whether to show progress bar
+
+        Returns:
+            List of ChunkWithEmbedding objects
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            self.embed_chunks,
+            chunks,
+            batch_size,
+            show_progress
+        )
 
     def compute_similarity(
         self,

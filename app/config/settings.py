@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings
-from typing import List
+from typing import List, Optional
 
 
 class Settings(BaseSettings):
@@ -12,6 +12,16 @@ class Settings(BaseSettings):
 
     # Embedding Model
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+
+    # LLM Configuration
+    openai_api_key: Optional[str] = None
+    llm_model: str = "gpt-3.5-turbo"
+    llm_temperature: float = 0.1  # Low temperature for factual RAG responses
+    llm_max_tokens: int = 500
+
+    # RAG Configuration
+    rag_top_k: int = 5
+    rag_score_threshold: float = 0.3  # Lower threshold for better recall
 
     # API Configuration
     api_title: str = "RAG Application API"
