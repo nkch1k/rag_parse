@@ -4,7 +4,7 @@ from typing import List, Optional, Dict, Any
 import logging
 import uuid
 from app.config.settings import settings
-from app.services.embeddings import get_embedding_service
+from app.services.embedding_service import get_embedding_service, ChunkWithEmbedding
 
 logger = logging.getLogger(__name__)
 
@@ -30,29 +30,38 @@ class VectorStoreService:
         self.port = port or settings.qdrant_port
         self.collection_name = collection_name or settings.qdrant_collection_name
 
-        logger.info(f"Connecting to Qdrant at {self.host}:{self.port}")
-        self.client = QdrantClient(host=self.host, port=self.port)
-        self.embedding_service = get_embedding_service()
+        try:
+            logger.info(f"Connecting to Qdrant at {self.host}:{self.port}")
+            self.client = QdrantClient(host=self.host, port=self.port)
+            self.embedding_service = get_embedding_service()
 
-        # Initialize collection
-        self._ensure_collection_exists()
+            # Initialize collection
+            self.init_collection()
+        except Exception as e:
+            logger.error(f"Failed to initialize VectorStoreService: {e}")
+            raise
 
-    def _ensure_collection_exists(self):
-        """Create collection if it doesn't exist."""
-        collections = self.client.get_collections().collections
-        collection_names = [col.name for col in collections]
+    def init_collection(self):
+        """Initialize Qdrant collection if it doesn't exist."""
+        try:
+            collections = self.client.get_collections().collections
+            collection_names = [col.name for col in collections]
 
-        if self.collection_name not in collection_names:
-            logger.info(f"Creating collection: {self.collection_name}")
-            self.client.create_collection(
-                collection_name=self.collection_name,
-                vectors_config=VectorParams(
-                    size=self.embedding_service.get_embedding_dimension(),
-                    distance=Distance.COSINE
+            if self.collection_name not in collection_names:
+                logger.info(f"Creating collection: {self.collection_name}")
+                self.client.create_collection(
+                    collection_name=self.collection_name,
+                    vectors_config=VectorParams(
+                        size=self.embedding_service.get_embedding_dimension(),
+                        distance=Distance.COSINE
+                    )
                 )
-            )
-        else:
-            logger.info(f"Collection {self.collection_name} already exists")
+                logger.info(f"Collection '{self.collection_name}' created successfully")
+            else:
+                logger.info(f"Collection '{self.collection_name}' already exists")
+        except Exception as e:
+            logger.error(f"Error initializing collection: {e}")
+            raise
 
     def add_document(
         self,
@@ -61,7 +70,7 @@ class VectorStoreService:
         doc_id: Optional[str] = None
     ) -> str:
         """
-        Add a document to the vector store.
+        Add a single document to the vector store.
 
         Args:
             content: Document content
@@ -71,27 +80,31 @@ class VectorStoreService:
         Returns:
             Document ID
         """
-        doc_id = doc_id or str(uuid.uuid4())
-        embedding = self.embedding_service.embed_text(content)
+        try:
+            doc_id = doc_id or str(uuid.uuid4())
+            embedding = self.embedding_service.embed_text(content)
 
-        payload = {
-            "content": content,
-            "metadata": metadata or {}
-        }
+            payload = {
+                "content": content,
+                "metadata": metadata or {}
+            }
 
-        point = PointStruct(
-            id=doc_id,
-            vector=embedding,
-            payload=payload
-        )
+            point = PointStruct(
+                id=doc_id,
+                vector=embedding,
+                payload=payload
+            )
 
-        self.client.upsert(
-            collection_name=self.collection_name,
-            points=[point]
-        )
+            self.client.upsert(
+                collection_name=self.collection_name,
+                points=[point]
+            )
 
-        logger.info(f"Added document with ID: {doc_id}")
-        return doc_id
+            logger.info(f"Added document with ID: {doc_id}")
+            return doc_id
+        except Exception as e:
+            logger.error(f"Error adding document: {e}")
+            raise
 
     def add_documents_batch(
         self,
@@ -106,72 +119,132 @@ class VectorStoreService:
         Returns:
             List of document IDs
         """
-        contents = [doc["content"] for doc in documents]
-        embeddings = self.embedding_service.embed_batch(contents)
+        try:
+            contents = [doc["content"] for doc in documents]
+            embeddings = self.embedding_service.embed_batch(contents)
 
-        points = []
-        doc_ids = []
+            points = []
+            doc_ids = []
 
-        for doc, embedding in zip(documents, embeddings):
-            doc_id = doc.get("id", str(uuid.uuid4()))
-            doc_ids.append(doc_id)
+            for doc, embedding in zip(documents, embeddings):
+                doc_id = doc.get("id", str(uuid.uuid4()))
+                doc_ids.append(doc_id)
 
-            payload = {
-                "content": doc["content"],
-                "metadata": doc.get("metadata", {})
-            }
+                payload = {
+                    "content": doc["content"],
+                    "metadata": doc.get("metadata", {})
+                }
 
-            points.append(PointStruct(
-                id=doc_id,
-                vector=embedding,
-                payload=payload
-            ))
+                points.append(PointStruct(
+                    id=doc_id,
+                    vector=embedding,
+                    payload=payload
+                ))
 
-        self.client.upsert(
-            collection_name=self.collection_name,
-            points=points
-        )
+            self.client.upsert(
+                collection_name=self.collection_name,
+                points=points
+            )
 
-        logger.info(f"Added {len(doc_ids)} documents")
-        return doc_ids
+            logger.info(f"Added {len(doc_ids)} documents to collection")
+            return doc_ids
+        except Exception as e:
+            logger.error(f"Error adding documents batch: {e}")
+            raise
+
+    def store_documents(
+        self,
+        chunks_with_embeddings: List[ChunkWithEmbedding]
+    ) -> List[str]:
+        """
+        Store chunks with embeddings in Qdrant.
+
+        Args:
+            chunks_with_embeddings: List of ChunkWithEmbedding objects
+
+        Returns:
+            List of document IDs
+        """
+        try:
+            if not chunks_with_embeddings:
+                logger.warning("No chunks to store")
+                return []
+
+            points = []
+            doc_ids = []
+
+            for chunk in chunks_with_embeddings:
+                doc_id = str(uuid.uuid4())
+                doc_ids.append(doc_id)
+
+                payload = {
+                    "content": chunk.content,
+                    "metadata": chunk.metadata,
+                    "chunk_index": chunk.chunk_index
+                }
+
+                points.append(PointStruct(
+                    id=doc_id,
+                    vector=chunk.embedding,
+                    payload=payload
+                ))
+
+            self.client.upsert(
+                collection_name=self.collection_name,
+                points=points
+            )
+
+            logger.info(f"Stored {len(doc_ids)} chunks in collection")
+            return doc_ids
+        except Exception as e:
+            logger.error(f"Error storing documents: {e}")
+            raise
 
     def search(
         self,
-        query: str,
+        query_text: str,
         top_k: int = 5,
         score_threshold: Optional[float] = None
     ) -> List[Dict[str, Any]]:
         """
-        Search for similar documents.
+        Search for similar documents by query text.
 
         Args:
-            query: Search query text
-            top_k: Number of results to return
-            score_threshold: Minimum similarity score
+            query_text: Search query text
+            top_k: Number of results to return (default: 5)
+            score_threshold: Minimum similarity score (optional)
 
         Returns:
-            List of search results with scores
+            List of search results with scores, content, and metadata
         """
-        query_embedding = self.embedding_service.embed_text(query)
+        try:
+            # Generate embedding for query
+            query_embedding = self.embedding_service.embed_text(query_text)
 
-        results = self.client.search(
-            collection_name=self.collection_name,
-            query_vector=query_embedding,
-            limit=top_k,
-            score_threshold=score_threshold
-        )
+            # Search in Qdrant
+            results = self.client.search(
+                collection_name=self.collection_name,
+                query_vector=query_embedding,
+                limit=top_k,
+                score_threshold=score_threshold
+            )
 
-        formatted_results = []
-        for result in results:
-            formatted_results.append({
-                "id": result.id,
-                "score": result.score,
-                "content": result.payload.get("content", ""),
-                "metadata": result.payload.get("metadata", {})
-            })
+            # Format results
+            formatted_results = []
+            for result in results:
+                formatted_results.append({
+                    "id": result.id,
+                    "score": result.score,
+                    "content": result.payload.get("content", ""),
+                    "metadata": result.payload.get("metadata", {}),
+                    "chunk_index": result.payload.get("chunk_index")
+                })
 
-        logger.info(f"Found {len(formatted_results)} results for query")
-        return formatted_results
+            logger.info(f"Found {len(formatted_results)} results for query: '{query_text[:50]}...'")
+            return formatted_results
+        except Exception as e:
+            logger.error(f"Error searching documents: {e}")
+            raise
 
     def delete_document(self, doc_id: str) -> bool:
         """
@@ -183,12 +256,16 @@ class VectorStoreService:
         Returns:
             True if successful
         """
-        self.client.delete(
-            collection_name=self.collection_name,
-            points_selector=[doc_id]
-        )
-        logger.info(f"Deleted document: {doc_id}")
-        return True
+        try:
+            self.client.delete(
+                collection_name=self.collection_name,
+                points_selector=[doc_id]
+            )
+            logger.info(f"Deleted document: {doc_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Error deleting document {doc_id}: {e}")
+            raise
 
     def get_collection_info(self) -> Dict[str, Any]:
         """
@@ -197,13 +274,17 @@ class VectorStoreService:
         Returns:
             Collection information
         """
-        info = self.client.get_collection(self.collection_name)
-        return {
-            "name": self.collection_name,
-            "vectors_count": info.vectors_count,
-            "points_count": info.points_count,
-            "status": info.status
-        }
+        try:
+            info = self.client.get_collection(self.collection_name)
+            return {
+                "name": self.collection_name,
+                "vectors_count": info.vectors_count,
+                "points_count": info.points_count,
+                "status": info.status
+            }
+        except Exception as e:
+            logger.error(f"Error getting collection info: {e}")
+            raise
 
 
 # Global vector store instance
