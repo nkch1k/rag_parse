@@ -82,13 +82,19 @@ cp .env.example .env
 ### Step 3: Start Qdrant Vector Database
 
 ```bash
-# Using Docker Compose (recommended)
+# Using Docker Compose (recommended - works on all platforms)
 docker-compose up -d qdrant
 
-# Or standalone Docker
+# Or standalone Docker (Unix/Mac/Linux)
 docker run -d -p 6333:6333 -p 6334:6334 \
     -v $(pwd)/qdrant_storage:/qdrant/storage:z \
     qdrant/qdrant
+
+# Or standalone Docker (Windows PowerShell)
+docker run -d -p 6333:6333 -p 6334:6334 -v ${PWD}/qdrant_storage:/qdrant/storage:z qdrant/qdrant
+
+# Or standalone Docker (Windows CMD)
+docker run -d -p 6333:6333 -p 6334:6334 -v %cd%/qdrant_storage:/qdrant/storage:z qdrant/qdrant
 ```
 
 ### Step 4: Install Dependencies
