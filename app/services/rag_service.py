@@ -122,16 +122,18 @@ class RAGService:
     """Service for RAG (Retrieval-Augmented Generation) operations."""
 
     # Default prompt template for RAG
-    DEFAULT_PROMPT_TEMPLATE = """You are a helpful AI assistant. Use the following pieces of context to answer the question at the end.
+    DEFAULT_PROMPT_TEMPLATE = """You are a helpful AI assistant that analyzes documents including Excel spreadsheets and Word documents.
 
-If you don't know the answer based on the context provided, just say "I don't have enough information to answer this question based on the provided context." Don't try to make up an answer.
+Use the following context to answer the question. When referencing specific data, mention the source document if available.
+
+If you don't have enough information in the context to answer the question, clearly state that. Do not make up information.
 
 Context:
 {context}
 
 Question: {question}
 
-Answer:"""
+Answer (respond in the same language as the question):"""
 
     def __init__(
         self,
