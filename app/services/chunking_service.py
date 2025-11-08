@@ -1,6 +1,6 @@
 from typing import List, Dict, Any, Optional
 import logging
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 import pandas as pd
 from app.models.document import DocumentChunk, ParsedDocument, FileType
 

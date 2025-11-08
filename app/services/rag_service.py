@@ -1,10 +1,9 @@
 from typing import List, Dict, Any, Iterator, Optional
 import logging
-from langchain.prompts import PromptTemplate
-from langchain.schema import Document
-from langchain.schema.retriever import BaseRetriever
-from langchain.chains import RetrievalQA
-from langchain.callbacks.base import BaseCallbackHandler
+from langchain_core.prompts import PromptTemplate
+from langchain_core.documents import Document
+from langchain_core.retrievers import BaseRetriever
+from langchain_core.callbacks import BaseCallbackHandler
 from app.config.settings import settings
 from app.services.vector_store import get_vector_store_service
 from app.services.llm_service import get_llm_service
@@ -15,6 +14,10 @@ logger = logging.getLogger(__name__)
 class VectorStoreRetriever(BaseRetriever):
     """Custom retriever that wraps our VectorStoreService."""
 
+    vector_store_service: Any
+    top_k: int = 5
+    score_threshold: Optional[float] = None
+
     def __init__(self, vector_store_service, top_k: int = 5, score_threshold: Optional[float] = None):
         """
         Initialize retriever.
@@ -24,10 +27,11 @@ class VectorStoreRetriever(BaseRetriever):
             top_k: Number of documents to retrieve
             score_threshold: Minimum similarity score
         """
-        super().__init__()
-        self.vector_store = vector_store_service
-        self.top_k = top_k
-        self.score_threshold = score_threshold
+        super().__init__(
+            vector_store_service=vector_store_service,
+            top_k=top_k,
+            score_threshold=score_threshold
+        )
 
     def _get_relevant_documents(self, query: str) -> List[Document]:
         """
@@ -41,7 +45,7 @@ class VectorStoreRetriever(BaseRetriever):
         """
         try:
             # Search using our vector store
-            results = self.vector_store.search(
+            results = self.vector_store_service.search(
                 query_text=query,
                 top_k=self.top_k,
                 score_threshold=self.score_threshold
@@ -77,7 +81,7 @@ class VectorStoreRetriever(BaseRetriever):
         """
         try:
             # Use async search method
-            results = await self.vector_store.search_async(
+            results = await self.vector_store_service.search_async(
                 query_text=query,
                 top_k=self.top_k,
                 score_threshold=self.score_threshold

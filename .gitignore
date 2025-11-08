@@ -51,4 +51,15 @@ htmlcov/
 
 # Data files (optional, uncomment if you don't want to track data)
 # data/*
-.prog_srt.md
+
+# Test files
+test_*.py
+debug_*.py
+create_test_files.py
+
+# Duplicate documentation
+SETUP.md
+TEST_CHECKLIST.md
+README_TEST.md
+CURL_EXAMPLES.md
+prog_srt.md

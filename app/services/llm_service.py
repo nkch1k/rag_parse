@@ -1,8 +1,8 @@
 from typing import Optional, Iterator
 import logging
 from langchain_openai import ChatOpenAI
-from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
-from langchain.callbacks.base import BaseCallbackHandler
+from langchain_core.callbacks import StreamingStdOutCallbackHandler
+from langchain_core.callbacks import BaseCallbackHandler
 from app.config.settings import settings
 
 logger = logging.getLogger(__name__)

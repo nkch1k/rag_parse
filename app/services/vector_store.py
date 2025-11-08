@@ -64,6 +64,26 @@ class VectorStoreService:
             logger.error(f"Error initializing collection: {e}")
             raise
 
+    def _ensure_collection_exists(self):
+        """Ensure collection exists, create if missing."""
+        try:
+            collections = self.client.get_collections().collections
+            collection_names = [col.name for col in collections]
+
+            if self.collection_name not in collection_names:
+                logger.warning(f"Collection '{self.collection_name}' missing, recreating...")
+                self.client.create_collection(
+                    collection_name=self.collection_name,
+                    vectors_config=VectorParams(
+                        size=self.embedding_service.get_embedding_dimension(),
+                        distance=Distance.COSINE
+                    )
+                )
+                logger.info(f"Collection '{self.collection_name}' recreated successfully")
+        except Exception as e:
+            logger.error(f"Error ensuring collection exists: {e}")
+            raise
+
     def add_document(
         self,
         content: str,
@@ -167,6 +187,9 @@ class VectorStoreService:
             List of document IDs
         """
         try:
+            # Ensure collection exists before storing
+            self._ensure_collection_exists()
+
             if not chunks_with_embeddings:
                 logger.warning("No chunks to store")
                 return []
@@ -239,6 +262,9 @@ class VectorStoreService:
             List of search results with scores, content, and metadata
         """
         try:
+            # Ensure collection exists before searching
+            self._ensure_collection_exists()
+
             # Generate embedding for query
             query_embedding = self.embedding_service.embed_text(query_text)
 

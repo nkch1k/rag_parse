@@ -142,7 +142,7 @@ async def ingest_document(
         chunking_service = get_chunking_service(chunk_size=500, chunk_overlap=50)
 
         # For text-based documents, rechunk; for Excel, use existing chunks
-        if parsed_doc.file_type.value == "excel":
+        if parsed_doc.file_type == "excel":
             chunks = parsed_doc.chunks
             logger.info("Using existing chunks for Excel file")
         else:
@@ -172,7 +172,7 @@ async def ingest_document(
             success=True,
             message="File successfully ingested and processed",
             filename=file.filename,
-            file_type=parsed_doc.file_type.value,
+            file_type=parsed_doc.file_type,
             chunks_created=len(chunks),
             chunks_stored=len(doc_ids)
         )
